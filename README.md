@@ -1,0 +1,1 @@
+# nuris_hardware_challenge
