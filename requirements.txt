@@ -1,3 +1,5 @@
 opencv-python
 imutils
 dlib
+torch
+torchvision

@@ -1,19 +1,40 @@
 import cv2
 import pickle
 import os
-from face_landmark import video_feed
-import dlib
-from face_recognition_model import model_init
-from utils_local import image_to_embedding
+
+from models.vgg_face import face_recogntion_model
+from models.mask import mask_model
+from models.glass import glass_model
+from models.face_detector import face_detector
+from models.eyes import eyes_area_segmentation
+
+import checker
+from utils_r.face_landmark import video_feed
+from utils_r.utils import texting_in_oval, image_to_embedding
+
+from passive_liveness.model import AntiSpoofPredict
+from passive_liveness.detection import passive_liveness
 
 
 print("Init Model of FR")
-model = model_init()
+model = face_recogntion_model()
 
-# Initialize face detector and shape predictor outside of the video_feed function
 print("Init Model of Detection")
-detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor('model_needed _zoom.dat')
+detector, predictor = face_detector(path_to_model='src/model_needed _zoom.dat')
+
+print("Init Model of Mask")
+mask_detection = mask_model(path_to_model='src/mask.h5')
+
+print("Init Model of Glass")
+glass_detection, glass_input, glass_output = glass_model()
+
+path_to_caffemodel = 'passive_liveness/detection_model/Widerface-RetinaFace.caffemodel'
+path_to_deploy = 'passive_liveness/detection_model/deploy.prototxt'
+
+path_to_MiniFASNetV2 = 'passive_liveness/anti_spoofing/2.7_80x80_MiniFASNetV2.pth'
+path_to_MiniFASNetV1SE = 'passive_liveness/anti_spoofing/4_0_0_80x80_MiniFASNetV1SE.pth'
+print("Init of Passive Liveness")
+passive_detection = AntiSpoofPredict(0, (path_to_deploy, path_to_caffemodel), (path_to_MiniFASNetV2, path_to_MiniFASNetV1SE))
 
 print("Init Face Database")
 database_path = "face_database.pkl"
@@ -26,18 +47,22 @@ else:
 face_locations = []
 status = False
 text = ''
+hyperp_text = ((25, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-person_name = input("Enter Your Name: ")
+person_name = 'K'
+
 
 print("Starting Video")
 def register_from_video():
-    global face_locations, status, text, person_name
+    global face_locations, status, text, person_name, hyperp_text
     
     video_capture = cv2.VideoCapture(0)
 
     while True:
         ret, frame = video_capture.read()
         frame = cv2.flip(frame, 1)
+
+        frame_face = frame.copy()
 
         if status == False:
             #Face Detection
@@ -57,32 +82,61 @@ def register_from_video():
             if not face_locations:
                 continue
 
-            face = frame[startY - 10:endY + 10, startX - 10:endX + 10]
-            frame, status_zoom = video_feed(frame, faces, face, predictor, gray)
+            face = frame_face[startY - 10:endY + 10, startX - 10:endX + 10]
+            frame, status_zoom, landmarks, hyperp_text = video_feed(frame, faces, face, predictor, gray)
 
             if status_zoom:
-                embedding = image_to_embedding(model, face)
-                
-                if person_name in face_database:
-                    text = f"{person_name} has been already registered successfully."
-                    status = True
+                #Mask Detection
+                status_mask = checker.mask_detection(mask_detection, face)
+                status_glass = checker.glass_detection(glass_detection, glass_input, glass_output, face)
+                status_eyes = checker.eyes_detection(eyes_area_segmentation(landmarks=landmarks))
+
+                if status_mask:
+                    status_text = "Mask Detected"
+                    frame = texting_in_oval(frame, status_text, hyperp_text[0], hyperp_text[1])
+                    # Display the resulting frame
+                    cv2.imshow('Video', frame)
+                    print(status_text)
                     continue
-                else:
-                    face_database[person_name] = embedding
+                
+                if status_glass:
+                    status_text = "Glass Detected"
+                    frame = texting_in_oval(frame, status_text, hyperp_text[0], hyperp_text[1])
+                    # Display the resulting frame
+                    cv2.imshow('Video', frame)
+                    print(status_text)                   
+                    continue
 
-                    # Save the updated database
-                with open(database_path, 'wb') as db_file:
-                    pickle.dump(face_database, db_file)
+                if status_eyes:
+                    status_text = "Open Your Eyes"
+                    frame = texting_in_oval(frame, status_text, hyperp_text[0], hyperp_text[1])
+                    # Display the resulting frame
+                    cv2.imshow('Video', frame)
+                    print(status_text)                    
+                    continue
+                    
+                if not status_mask and not status_glass:
+                    status_liveness = passive_liveness(passive_detection, frame_face)
+                    print(status_liveness)
+                    status_text = "Accepted"
+                    frame = texting_in_oval(frame, status_text, hyperp_text[0], hyperp_text[1])
 
-                text = f"{person_name} has been registered successfully."
+                    embedding = image_to_embedding(model, face)
+                    
+                    if person_name in face_database:
+                        text = f"{person_name} has been already registered successfully."
+                        status = True
+                        continue
+                    else:
+                        face_database[person_name] = embedding
 
-        coordinates = (25, 50)
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        fontScale = 1
-        color = (255, 0, 0)
-        thickness = 2
-        image = cv2.putText(frame, text, coordinates, font,
-                        fontScale, color, thickness, cv2.LINE_AA)
+                        # Save the updated database
+                    with open(database_path, 'wb') as db_file:
+                        pickle.dump(face_database, db_file)
+
+                    text = f"{person_name} has been registered successfully."
+
+
         # Display the resulting frame
         cv2.imshow('Video', frame)
 
