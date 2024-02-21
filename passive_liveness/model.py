@@ -45,7 +45,7 @@ class AntiSpoofPredict(Detection):
         
         self.MiniFASNetV2, self.MiniFASNetV2_params = self._load_model(model_path=str(path_to_passive[0]))
         self.MiniFASNetV1SE, self.MiniFASNetV1SE_params = self._load_model(model_path=str(path_to_passive[1]))
-        print("Initted PL")
+        print("Initted Passive Liveness")
 
     def _load_model(self, model_path):
         # define model

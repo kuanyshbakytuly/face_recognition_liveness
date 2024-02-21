@@ -47,14 +47,15 @@ else:
 face_locations = []
 status = False
 text = ''
+sub_text = ''
 hyperp_text = ((25, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-person_name = 'K'
+person_name = 'Kuanysh'
 
 
 print("Starting Video")
 def register_from_video():
-    global face_locations, status, text, person_name, hyperp_text
+    global face_locations, status, text, person_name, hyperp_text, sub_text
     
     video_capture = cv2.VideoCapture(0)
 
@@ -107,34 +108,41 @@ def register_from_video():
 
                             if status_liveness:
                                 #Converting image to embdedding
+                                embedding = image_to_embedding(model, face)
+                                status_text = f"{person_name} has already been registered successfully."
 
-                                #embedding = image_to_embedding(model, face)
-                                '''if person_name in face_database:
-                                    text = f"{person_name} has been already registered successfully."
-                                    status = True
-                                    continue
-                                else:
+                                if not person_name in face_database:
                                     face_database[person_name] = embedding
 
                                     # Save the updated database
-                                with open(database_path, 'wb') as db_file:
-                                    pickle.dump(face_database, db_file)
+                                    with open(database_path, 'wb') as db_file:
+                                        pickle.dump(face_database, db_file)
 
-                                text = f"{person_name} has been registered successfully."'''
-                                status_text = 'Accepted'
+                                    text = f"{person_name} has been registered successfully."
+                                    status_text = text
+                                sub_text = "To Continue Registration TAP F, and enter name"
+                                status = True
 
-        frame = texting_in_oval(frame, status_text, hyperp_text[1], hyperp_text[2])
-        status_text = ''
+
+        if cv2.waitKey(1) & 0xFF == ord('f'):
+            status = False
+            status_text = ""
+            sub_text = ""
+            frame = texting_in_oval(frame, status_text, sub_text, hyperp_text[1], hyperp_text[2])
+            cv2.imshow('Video', frame)
+            person_name = input("Enter Your Name: ")
+
+        frame = texting_in_oval(frame, status_text, sub_text, hyperp_text[1], hyperp_text[2])
+
+        if not status:
+            status_text = ""
+
         # Display the resulting frame
         cv2.imshow('Video', frame)
 
         # Break the loop when 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-
-        if cv2.waitKey(1) & 0xFF == ord('f'):
-            status = False
-            person_name = input("Enter Your Name: ")
 
     # Release the capture when everything is done
     video_capture.release()

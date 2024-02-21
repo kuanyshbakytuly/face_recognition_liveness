@@ -1,13 +1,17 @@
 import cv2
 import numpy as np
 
-def texting_in_oval(image, text, oval_center, axes):
+def texting_in_oval(image, text, sub_text, oval_center, axes):
     text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)[0]
     text_x = oval_center[0] - text_size[0] // 2
-    text_y = oval_center[1] - axes[1] - 10 # 10 pixels above the top of the oval 
+    text_y = oval_center[1] - axes - 10 # 10 pixels above the top of the oval 
 
     cv2.putText(image, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)   
-
+    if sub_text != '':
+        text_size = cv2.getTextSize(sub_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)[0]
+        text_x = oval_center[0] - text_size[0] // 2
+        text_y += 40
+        cv2.putText(image, sub_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2) 
     return image
 
 def check_image_quality(image):
@@ -60,4 +64,4 @@ def recognize_face(model, face_image, input_embeddings):
     if minimum_distance > 0.6:
         return str(name)
     else:
-        return None
+        return 'Unknown'

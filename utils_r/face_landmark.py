@@ -63,4 +63,4 @@ def video_feed(frame, faces, facee, predictor, gray):
         status_text = "Please zoom in"
         status = False
 
-    return frame, status, status_text, [landmarks, oval_center, axes]
+    return frame, status, status_text, [landmarks, oval_center, axes[1]]

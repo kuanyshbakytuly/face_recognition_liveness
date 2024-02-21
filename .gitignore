@@ -2,3 +2,5 @@ faces
 .venv
 face_database.pkl.py
 crowd_human
+
+git clone --branch master https://github.com/kuanyshbakytuly/nuris_hardware_challenge.git
