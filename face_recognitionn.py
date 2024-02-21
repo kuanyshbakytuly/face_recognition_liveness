@@ -1,10 +1,10 @@
 import cv2
 import pickle
 import os
-from face_landmark import video_feed
+from utils.face_landmark import video_feed
 import dlib
-from utils_local import recognize_face
-from face_recognition_model import model_init
+from utils.utils import recognize_face
+from models.vgg_face import model_init
 
 
 print("Init Model of FR")

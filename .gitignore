@@ -1,4 +1,3 @@
 faces
-test.py
 .venv
-face_register_images.py
+face_database.pkl.py
