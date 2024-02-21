@@ -1,4 +1,4 @@
 faces
 .venv
 face_database.pkl.py
-crowd_human/
+crowd_human
