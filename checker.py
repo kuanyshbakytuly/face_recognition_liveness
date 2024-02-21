@@ -4,7 +4,7 @@ import cv2
 def mask_detection(model, face):
     
     output = model.predict(np.expand_dims(face, axis = 0))
-    print(output[:,1])
+
     if(output[:,1] > 0.001):
         name='no mask found'
         return False
@@ -27,6 +27,7 @@ def glass_detection(interpreter, input_details, output_details, face):
 
 def eyes_detection(eye):
     return eye < 0.27
+
 
 
 

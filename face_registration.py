@@ -83,60 +83,48 @@ def register_from_video():
                 continue
 
             face = frame_face[startY - 10:endY + 10, startX - 10:endX + 10]
-            frame, status_zoom, landmarks, hyperp_text = video_feed(frame, faces, face, predictor, gray)
+            frame, status_zoom, status_text, hyperp_text = video_feed(frame, faces, face, predictor, gray)
 
             if status_zoom:
                 #Mask Detection
                 status_mask = checker.mask_detection(mask_detection, face)
-                status_glass = checker.glass_detection(glass_detection, glass_input, glass_output, face)
-                status_eyes = checker.eyes_detection(eyes_area_segmentation(landmarks=landmarks))
+                status_text = 'Mask is detected'
 
-                if status_mask:
-                    status_text = "Mask Detected"
-                    frame = texting_in_oval(frame, status_text, hyperp_text[0], hyperp_text[1])
-                    # Display the resulting frame
-                    cv2.imshow('Video', frame)
-                    print(status_text)
-                    continue
-                
-                if status_glass:
-                    status_text = "Glass Detected"
-                    frame = texting_in_oval(frame, status_text, hyperp_text[0], hyperp_text[1])
-                    # Display the resulting frame
-                    cv2.imshow('Video', frame)
-                    print(status_text)                   
-                    continue
+                if not status_mask:
+                    #Glass Detection
+                    status_glass = checker.glass_detection(glass_detection, glass_input, glass_output, face)
+                    status_text = 'Glass is detected'
 
-                if status_eyes:
-                    status_text = "Open Your Eyes"
-                    frame = texting_in_oval(frame, status_text, hyperp_text[0], hyperp_text[1])
-                    # Display the resulting frame
-                    cv2.imshow('Video', frame)
-                    print(status_text)                    
-                    continue
-                    
-                if not status_mask and not status_glass:
-                    status_liveness = passive_liveness(passive_detection, frame_face)
-                    print(status_liveness)
-                    status_text = "Accepted"
-                    frame = texting_in_oval(frame, status_text, hyperp_text[0], hyperp_text[1])
+                    if not status_glass:
+                        #Eyes Detection
+                        status_eyes = checker.eyes_detection(eyes_area_segmentation(landmarks=hyperp_text[0]))
+                        status_text = 'Closed Eyes is detected'
 
-                    embedding = image_to_embedding(model, face)
-                    
-                    if person_name in face_database:
-                        text = f"{person_name} has been already registered successfully."
-                        status = True
-                        continue
-                    else:
-                        face_database[person_name] = embedding
+                        if not status_eyes:           
+                            #Liveness Detection
+                            status_liveness = passive_liveness(passive_detection, frame_face)
+                            status_text = 'Spoof is detected'
 
-                        # Save the updated database
-                    with open(database_path, 'wb') as db_file:
-                        pickle.dump(face_database, db_file)
+                            if status_liveness:
+                                #Converting image to embdedding
 
-                    text = f"{person_name} has been registered successfully."
+                                #embedding = image_to_embedding(model, face)
+                                '''if person_name in face_database:
+                                    text = f"{person_name} has been already registered successfully."
+                                    status = True
+                                    continue
+                                else:
+                                    face_database[person_name] = embedding
 
+                                    # Save the updated database
+                                with open(database_path, 'wb') as db_file:
+                                    pickle.dump(face_database, db_file)
 
+                                text = f"{person_name} has been registered successfully."'''
+                                status_text = 'Accepted'
+
+        frame = texting_in_oval(frame, status_text, hyperp_text[1], hyperp_text[2])
+        status_text = ''
         # Display the resulting frame
         cv2.imshow('Video', frame)
 
@@ -146,7 +134,6 @@ def register_from_video():
 
         if cv2.waitKey(1) & 0xFF == ord('f'):
             status = False
-            print(text)
             person_name = input("Enter Your Name: ")
 
     # Release the capture when everything is done

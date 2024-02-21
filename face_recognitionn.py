@@ -1,9 +1,9 @@
 import cv2
 import pickle
 import os
-from utils.face_landmark import video_feed
+from utils_r.face_landmark import video_feed
 import dlib
-from utils.utils import recognize_face
+from utils_r.utils import recognize_face
 from models.vgg_face import model_init
 
 

@@ -63,6 +63,4 @@ def video_feed(frame, faces, facee, predictor, gray):
         status_text = "Please zoom in"
         status = False
 
-    # Draw the text
-    frame = texting_in_oval(frame, status_text, oval_center, axes)
-    return frame, status, landmarks, [oval_center, axes]
+    return frame, status, status_text, [landmarks, oval_center, axes]
