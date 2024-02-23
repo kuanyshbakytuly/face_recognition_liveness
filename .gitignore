@@ -1,6 +1,8 @@
 faces
 .venv
 face_database.pkl.py
-crowd_human
+src
 
-git clone --branch master https://github.com/kuanyshbakytuly/nuris_hardware_challenge.git
+git add .gitignore
+git commit -am 'a change'
+git push

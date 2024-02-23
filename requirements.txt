@@ -7,5 +7,4 @@ tqdm==4.41.0
 matplotlib==3.2.2
 pandas
 seaborn==0.11.0
-
-git filter-branch --tree-filter 'rm -rf crowd_human/crowdhuman_yolov5m.pt' HEAD
+pytorch-lightning

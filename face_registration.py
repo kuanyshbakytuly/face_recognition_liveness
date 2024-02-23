@@ -1,31 +1,42 @@
 import cv2
 import pickle
 import os
+import tensorflow as tf
+import torch
 
-from models.vgg_face import face_recogntion_model
-from models.mask import mask_model
-from models.glass import glass_model
-from models.face_detector import face_detector
-from models.eyes import eyes_area_segmentation
+from utils_local.models.vgg_face import face_recogntion_model
+from utils_local.models.mask import mask_model
+from utils_local.models.glass import glass_model
+from utils_local.models.face_detector import face_detector
+from utils_local.models.eyes import eyes_area_segmentation
 
 import checker
-from utils_r.face_landmark import video_feed
-from utils_r.utils import texting_in_oval, image_to_embedding
+from utils_local.utils.face_landmark import video_feed
+from utils_local.utils.utils import texting_in_oval, image_to_embedding
 
 from passive_liveness.model import AntiSpoofPredict
 from passive_liveness.detection import passive_liveness
 
 
-print("Init Model of FR")
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print('Torch uses {}'.format(device))
+if tf.test.gpu_device_name():
+    print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+else:
+    print("Please install GPU version of TF")
+
+print("Init Model of FR in TensorFlow")
 model = face_recogntion_model()
 
-print("Init Model of Detection")
+print("Init Model of Detection in Dlib")
+#import dlib.cuda as cuda
+#print(f'Dlib runs on GPU: {cuda.get_num_devices() == 1}')
 detector, predictor = face_detector(path_to_model='src/model_needed _zoom.dat')
 
-print("Init Model of Mask")
-mask_detection = mask_model(path_to_model='src/mask.h5')
+print("Init Model of Mask in Torch")
+mask_detection = mask_model(path_to_model='src/mask.h5', device=device)
 
-print("Init Model of Glass")
+print("Init Model of Glass in TensorFlow")
 glass_detection, glass_input, glass_output = glass_model()
 
 path_to_caffemodel = 'passive_liveness/detection_model/Widerface-RetinaFace.caffemodel'
@@ -48,91 +59,85 @@ face_locations = []
 status = False
 text = ''
 sub_text = ''
-hyperp_text = ((25, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+status_text = ''
+
+# Set parameters for oval
+camera_height = 720
+camera_width = 1280
+hyperp_text = [(camera_width // 2, camera_height // 2), 150]
+
+counter_for_tail = 0
+counter_for_status = 0
 
 person_name = 'Kuanysh'
 
-
 print("Starting Video")
-def register_from_video():
-    global face_locations, status, text, person_name, hyperp_text, sub_text
+def register_from_video(face_camera: int):
+    global face_locations, status, text, person_name, hyperp_text, sub_text, status_text, hyperp_text
     
-    video_capture = cv2.VideoCapture(0)
+    video_capture = cv2.VideoCapture(face_camera)
 
     while True:
         ret, frame = video_capture.read()
         frame = cv2.flip(frame, 1)
 
-        frame_face = frame.copy()
-
+        #Face Camera
         if status == False:
             #Face Detection
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            frame_face = frame.copy()
+            face, landmarks, status_face = checker.face_detection(detector, predictor, frame, frame_face)
+            
+            if status_face:
+                frame, status_zoom, status_text, landmarks = video_feed(landmarks, frame, face)
 
-            faces = detector(gray, 0)
-            for face in faces:
-                # Get the coordinates of the face rectangle
-                startX = face.left()
-                startY = face.top()
-                endX = face.right()
-                endY = face.bottom()
+                if status_zoom:
+                    #Mask Detection
+                    status_mask = checker.mask_detection(mask_detection, face)
+                    status_text = 'Mask is detected'
 
-                face_locations = [startX, startY, endX, endY]
-        
-    
-            if not face_locations:
-                continue
+                    if not status_mask:
+                        #Glass Detection
+                        status_glass = checker.glass_detection(glass_detection, glass_input, glass_output, face)
+                        status_text = 'Glass is detected'
 
-            face = frame_face[startY - 10:endY + 10, startX - 10:endX + 10]
-            frame, status_zoom, status_text, hyperp_text = video_feed(frame, faces, face, predictor, gray)
+                        if not status_glass:
+                            #Eyes Detection
+                            status_eyes = checker.eyes_detection(eyes_area_segmentation(landmarks=landmarks))
+                            status_text = 'Closed Eyes is detected'
 
-            if status_zoom:
-                #Mask Detection
-                status_mask = checker.mask_detection(mask_detection, face)
-                status_text = 'Mask is detected'
+                            if not status_eyes:           
+                                #Liveness Detection
+                                status_liveness = passive_liveness(passive_detection, frame_face)
+                                status_text = 'Spoof is detected'
 
-                if not status_mask:
-                    #Glass Detection
-                    status_glass = checker.glass_detection(glass_detection, glass_input, glass_output, face)
-                    status_text = 'Glass is detected'
+                                if status_liveness:
+                                    #Converting image to embdedding
+                                    tf.debugging.set_log_device_placement(True)
+                                    embedding = image_to_embedding(model, face)
+                                    status_text = f"{person_name} has already been registered successfully."
 
-                    if not status_glass:
-                        #Eyes Detection
-                        status_eyes = checker.eyes_detection(eyes_area_segmentation(landmarks=hyperp_text[0]))
-                        status_text = 'Closed Eyes is detected'
+                                    if not person_name in face_database:
+                                        face_database[person_name] = embedding
 
-                        if not status_eyes:           
-                            #Liveness Detection
-                            status_liveness = passive_liveness(passive_detection, frame_face)
-                            status_text = 'Spoof is detected'
+                                        # Save the updated database
+                                        with open(database_path, 'wb') as db_file:
+                                            pickle.dump(face_database, db_file)
 
-                            if status_liveness:
-                                #Converting image to embdedding
-                                embedding = image_to_embedding(model, face)
-                                status_text = f"{person_name} has already been registered successfully."
-
-                                if not person_name in face_database:
-                                    face_database[person_name] = embedding
-
-                                    # Save the updated database
-                                    with open(database_path, 'wb') as db_file:
-                                        pickle.dump(face_database, db_file)
-
-                                    text = f"{person_name} has been registered successfully."
-                                    status_text = text
-                                sub_text = "To Continue Registration TAP F, and enter name"
-                                status = True
+                                        text = f"{person_name} has been registered successfully."
+                                        status_text = text
+                                    sub_text = "To Continue Registration TAP F, and enter name"
+                                    status = True
 
 
         if cv2.waitKey(1) & 0xFF == ord('f'):
             status = False
             status_text = ""
             sub_text = ""
-            frame = texting_in_oval(frame, status_text, sub_text, hyperp_text[1], hyperp_text[2])
+            frame = texting_in_oval(frame, status_text, sub_text, hyperp_text[0], hyperp_text[1])
             cv2.imshow('Video', frame)
             person_name = input("Enter Your Name: ")
 
-        frame = texting_in_oval(frame, status_text, sub_text, hyperp_text[1], hyperp_text[2])
+        frame = texting_in_oval(frame, status_text, sub_text, hyperp_text[0], hyperp_text[1])
 
         if not status:
             status_text = ""
@@ -149,4 +154,4 @@ def register_from_video():
     cv2.destroyAllWindows()
 
 # Example usage
-register_from_video()
+register_from_video(1)
